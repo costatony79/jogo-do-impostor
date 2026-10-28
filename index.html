@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jogo do Impostor</title>
+<meta name="description" content="Todos recebem a mesma palavra, menos o impostor. Cada um dá uma pista na sua vez, com tempo marcado. Mais de 2.900 palavras em 26 categorias.">
+<meta name="theme-color" content="#12101f">
+<style>
+  :root {
+    --fundo: #12101f;
+    --fundo2: #241d45;
+    --painel: rgba(255,255,255,.07);
+    --borda: rgba(255,255,255,.14);
+    --texto: #f6f2ff;
+    --suave: #b9b0dd;
+    --sol: #ffc93c;
+    --verm: #ff4d5e;
+    --menta: #3ddc97;
+    --azul: #6ea8ff;
+    --raio: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -15%, var(--fundo2), var(--fundo) 60%) fixed;
+    color: var(--texto);
+    font: 17px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    padding: 14px 16px 28px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pagina { max-width: 960px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 900; letter-spacing: .01em; }
+  h1 span { color: var(--verm); }
+  h2 { margin: 0 0 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .1em; color: var(--suave); }
+  .tela { display: none; }
+  .tela.ativa { display: block; animation: surgir .25s ease; }
+  @keyframes surgir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .bloco { background: var(--painel); border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; margin-bottom: 14px; }
+  .linha { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .entre { justify-content: space-between; }
+  .dica { color: var(--suave); font-size: .92rem; margin: 6px 0 0; }
+
+  textarea, select {
+    width: 100%; background: rgba(0,0,0,.28); color: var(--texto); border: 1px solid var(--borda);
+    border-radius: 12px; padding: 10px 12px; font: inherit;
+  }
+  textarea { min-height: 150px; resize: vertical; }
+  select { width: auto; min-width: 110px; }
+  textarea:focus, select:focus, button:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+
+  button {
+    font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 12px 18px; cursor: pointer;
+    background: rgba(255,255,255,.12); color: var(--texto); transition: transform .08s, filter .15s;
+  }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-principal { background: var(--sol); color: #241a00; font-size: 1.15rem; padding: 15px 24px; }
+  .btn-verm { background: var(--verm); color: #fff; }
+  .btn-menta { background: var(--menta); color: #04281a; }
+  .btn-pequeno { padding: 7px 12px; font-size: .9rem; }
+  .btn-largo { width: 100%; }
+
+  /* Categorias */
+  .categorias { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 10px; }
+  .cat {
+    display: flex; align-items: center; gap: 10px; text-align: left; font-weight: 600; padding: 10px 12px;
+    background: rgba(0,0,0,.22); border: 2px solid transparent; color: var(--suave);
+  }
+  .cat .ico { font-size: 1.4rem; line-height: 1; }
+  .cat .nome { flex: 1; line-height: 1.2; }
+  .cat .qtd { font-size: .8rem; opacity: .8; }
+  .cat[aria-pressed="true"] { border-color: var(--sol); color: var(--texto); background: rgba(255,201,60,.12); }
+
+  .opcoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .opcoes label { display: grid; gap: 6px; font-weight: 600; }
+  .check { display: flex !important; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; }
+  .check input { width: 22px; height: 22px; accent-color: var(--sol); }
+  .erro { color: var(--verm); font-weight: 700; min-height: 1.4em; margin: 8px 0 0; }
+
+  /* Telas do jogo */
+  .centro { text-align: center; }
+  .rotulo { font-size: .85rem; text-transform: uppercase; letter-spacing: .14em; color: var(--suave); }
+  .nome-grande { font-size: clamp(2.4rem, 9vw, 5.5rem); font-weight: 900; line-height: 1.05; margin: 6px 0 14px; word-break: break-word; }
+  .cartao {
+    max-width: 560px; margin: 0 auto; border-radius: 22px; padding: 26px 20px; min-height: 260px;
+    display: grid; place-items: center; gap: 10px; background: var(--painel); border: 2px solid var(--borda);
+  }
+  .cartao.palavra { background: linear-gradient(160deg, #1f5f4a, #143b33); border-color: var(--menta); }
+  .cartao.impostor { background: linear-gradient(160deg, #6d1626, #3a0d18); border-color: var(--verm); }
+  .palavra-grande { font-size: clamp(2rem, 8vw, 4rem); font-weight: 900; line-height: 1.1; word-break: break-word; }
+  .progresso { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 16px 0 0; }
+  .progresso span { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.18); }
+  .progresso span.feito { background: var(--menta); }
+  .progresso span.atual { background: var(--sol); }
+  .acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+
+  .info-rodada { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; color: var(--suave); font-weight: 600; }
+  .info-rodada b { color: var(--texto); }
+  .relogio { position: relative; width: min(62vw, 300px); aspect-ratio: 1; margin: 6px auto 0; }
+  .relogio svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .relogio circle { fill: none; stroke-width: 12; }
+  .relogio .trilho { stroke: rgba(255,255,255,.12); }
+  .relogio .arco { stroke: var(--menta); stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .3s; }
+  .relogio.alerta .arco { stroke: var(--sol); }
+  .relogio.fim .arco { stroke: var(--verm); }
+  .relogio .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(3rem, 14vw, 6rem); font-weight: 900; font-variant-numeric: tabular-nums; }
+  .relogio.fim .num { color: var(--verm); font-size: clamp(1.6rem, 6vw, 2.4rem); }
+  .ordem { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 18px; }
+  .ordem span { padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--suave); font-size: .9rem; }
+  .ordem span.feito { opacity: .45; text-decoration: line-through; }
+  .ordem span.atual { background: var(--sol); color: #241a00; font-weight: 800; }
+
+  .lista-revelada { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .lista-revelada .nome-grande { margin: 0; color: var(--verm); }
+  details { margin-top: 4px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details ol { margin: 10px 0 0; padding-left: 22px; color: var(--suave); }
+  details li { margin-bottom: 4px; }
+  .rodape { text-align: center; color: var(--suave); font-size: .85rem; margin-top: 22px; }
+  .rodape a { color: var(--suave); }
+  @media (max-width: 520px) { .categorias { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header>
+    <h1>Jogo do <span>Impostor</span></h1>
+    <button id="btnSom" class="btn-pequeno" type="button" aria-pressed="true" title="Ligar ou desligar o som">🔊 Som</button>
+  </header>
+
+  <!-- 1. Configuração -->
+  <section id="tela-config" class="tela ativa">
+    <div class="bloco">
+      <details>
+        <summary>Como jogar</summary>
+        <ol>
+          <li>Escreva o nome dos jogadores, escolha as categorias e toque em <b>Começar partida</b>.</li>
+          <li>Passe o aparelho de mão em mão. Cada um vê a palavra secreta escondido dos colegas. Um deles (ou mais) recebe <b>IMPOSTOR</b> no lugar da palavra.</li>
+          <li>Coloque o aparelho onde todos vejam (ou no projetor). Na sua vez, cada um diz <b>uma pista</b> sobre a palavra, dentro do tempo.</li>
+          <li>O impostor não sabe a palavra: ele precisa disfarçar e dar uma pista que pareça certa.</li>
+          <li>No fim das rodadas, a turma vota em quem acha que é o impostor. Depois, toque em <b>Revelar</b>.</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="bloco">
+      <h2>Jogadores</h2>
+      <textarea id="campoJogadores" placeholder="Um nome por linha. Ex.:&#10;Ana&#10;Bruno&#10;Carla" spellcheck="false" aria-label="Nomes dos jogadores, um por linha"></textarea>
+      <p class="dica" id="contaJogadores">Nenhum jogador ainda. São precisos pelo menos 3.</p>
+    </div>
+
+    <div class="bloco">
+      <div class="linha entre">
+        <h2 style="margin:0">Categorias</h2>
+        <div class="linha">
+          <button type="button" class="btn-pequeno" id="btnTodas">Marcar todas</button>
+          <button type="button" class="btn-pequeno" id="btnNenhuma">Desmarcar todas</button>
+        </div>
+      </div>
+      <div class="categorias" id="listaCategorias"></div>
+      <p class="dica" id="contaPalavras"></p>
+    </div>
+
+    <div class="bloco">
+      <h2>Regras da partida</h2>
+      <div class="opcoes">
+        <label>Tempo para cada pista
+          <select id="optTempo">
+            <option value="10">10 segundos</option>
+            <option value="15">15 segundos</option>
+            <option value="20">20 segundos</option>
+            <option value="30" selected>30 segundos</option>
+            <option value="45">45 segundos</option>
+            <option value="60">1 minuto</option>
+          </select>
+        </label>
+        <label>Rodadas de pistas
+          <select id="optRodadas">
+            <option value="1">1 rodada</option>
+            <option value="2" selected>2 rodadas</option>
+            <option value="3">3 rodadas</option>
+          </select>
+        </label>
+        <label>Número de impostores
+          <select id="optImpostores">
+            <option value="1" selected>1 impostor</option>
+            <option value="2">2 impostores</option>
+            <option value="3">3 impostores</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:14px">
+        <label class="check"><input type="checkbox" id="optCategoria" checked> Mostrar a categoria da palavra para todos (o impostor também vê)</label>
+      </div>
+    </div>
+
+    <button type="button" class="btn-principal btn-largo" id="btnComecar">Começar partida</button>
+    <p class="erro" id="erroConfig" role="alert"></p>
+  </section>
+
+  <!-- 2. Distribuição da palavra -->
+  <section id="tela-distribuicao" class="tela centro">
+    <div id="passeAparelho">
+      <div class="rotulo" id="contaDistribuicao">Jogador 1 de 5</div>
+      <p class="dica" style="margin-top:4px">Passe o aparelho para</p>
+      <div class="nome-grande" id="nomeDistribuicao">Nome</div>
+      <div class="cartao">
+        <div>
+          <p style="margin:0 0 14px">Só <b id="nomeDistribuicao2">você</b> pode olhar a tela agora.</p>
+          <button type="button" class="btn-principal" id="btnVerPalavra">Ver minha palavra</button>
+        </div>
+      </div>
+    </div>
+    <div id="mostraPalavra" hidden>
+      <div class="rotulo" id="rotuloDono">Palavra de</div>
+      <div class="nome-grande" id="nomeDono" style="font-size:clamp(1.6rem,6vw,2.6rem)">Nome</div>
+      <div class="cartao" id="cartaoPalavra">
+        <div>
+          <div class="rotulo" id="rotuloPalavra">A palavra secreta é</div>
+          <div class="palavra-grande" id="textoPalavra">Palavra</div>
+          <p class="dica" id="textoCategoria"></p>
+        </div>
+      </div>
+      <div class="acoes">
+        <button type="button" class="btn-principal" id="btnEsconder">Entendi, esconder</button>
+      </div>
+    </div>
+    <div class="progresso" id="progressoDistribuicao"></div>
+    <div class="acoes"><button type="button" class="btn-pequeno" id="btnCancelar1">Cancelar partida</button></div>
+  </section>
+
+  <!-- 3. Todos viram -->
+  <section id="tela-pronto" class="tela centro">
+    <div class="cartao">
+      <div>
+        <div class="palavra-grande" style="font-size:clamp(1.8rem,6vw,3rem)">Todos já viram a palavra!</div>
+        <p class="dica" style="font-size:1.05rem">Coloque o aparelho onde a turma toda veja.<br>Quem começa: <b id="quemComeca"></b></p>
+        <div class="acoes"><button type="button" class="btn-principal" id="btnIniciarPistas">Começar as pistas</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Pistas -->
+  <section id="tela-pistas" class="tela centro">
+    <div class="info-rodada">
+      <span>Rodada <b id="numRodada">1</b> de <b id="totRodadas">2</b></span>
+      <span id="infoCategoria">Categoria: <b id="nomeCategoria"></b></span>
+    </div>
+    <div class="rotulo" style="margin-top:14px">Vez de dar a pista</div>
+    <div class="nome-grande" id="nomeVez">Nome</div>
+    <div class="relogio" id="relogio">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="trilho" cx="60" cy="60" r="52"></circle>
+        <circle class="arco" id="arco" cx="60" cy="60" r="52"></circle>
+      </svg>
+      <div class="num" id="numTempo" aria-live="polite">30</div>
+    </div>
+    <div class="acoes" id="acoesPistas"></div>
+    <div class="ordem" id="ordemPistas"></div>
+    <div class="acoes"><button type="button" class="btn-pequeno" id="btnIrVotacao">Pular para a votação</button></div>
+  </section>
+
+  <!-- 5. Votação -->
+  <section id="tela-votacao" class="tela centro">
+    <div class="cartao">
+      <div>
+        <div class="palavra-grande" style="font-size:clamp(1.8rem,6vw,3rem)">Hora da votação!</div>
+        <p class="dica" style="font-size:1.05rem" id="textoVotacao">Conversem e votem: quem é o impostor?</p>
+        <div class="relogio" id="relogioDebate" style="width:min(44vw,180px)">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="trilho" cx="60" cy="60" r="52"></circle>
+            <circle class="arco" id="arcoDebate" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <div class="num" id="numDebate" style="font-size:clamp(1.8rem,8vw,2.6rem)">2:00</div>
+        </div>
+        <div class="acoes">
+          <button type="button" id="btnDebate">Marcar 2 minutos de conversa</button>
+          <button type="button" id="btnMaisRodada">Mais uma rodada de pistas</button>
+        </div>
+        <div class="acoes"><button type="button" class="btn-principal btn-verm" id="btnRevelar">Revelar o impostor</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Revelação -->
+  <section id="tela-revelacao" class="tela centro">
+    <div class="rotulo" id="rotuloImpostor">O impostor era</div>
+    <div class="lista-revelada" id="listaImpostores"></div>
+    <div class="cartao palavra" style="margin-top:18px; min-height:0">
+      <div>
+        <div class="rotulo">A palavra secreta era</div>
+        <div class="palavra-grande" id="palavraRevelada">Palavra</div>
+        <p class="dica" id="categoriaRevelada"></p>
+      </div>
+    </div>
+    <div class="acoes">
+      <button type="button" class="btn-principal" id="btnNovaPartida">Nova partida</button>
+      <button type="button" id="btnConfigurar">Mudar jogadores ou categorias</button>
+    </div>
+  </section>
+
+  <p class="rodape">Feito por Tony Costa · <a href="https://costatony79.github.io/">outros apps</a></p>
+</div>
+
+<script src="palavras.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+
+  // ---------- Banco de palavras ----------
+  const CATS = window.CATEGORIAS.map(c => ({
+    ...c,
+    lista: c.palavras.split(/\s*[,\n]\s*/).map(p => p.trim()).filter(Boolean)
+  }));
+
+  // ---------- Preferências guardadas no aparelho ----------
+  const guardar = (k, v) => { try { localStorage.setItem("impostor." + k, JSON.stringify(v)); } catch (e) {} };
+  const ler = (k, padrao) => { try { const v = localStorage.getItem("impostor." + k); return v === null ? padrao : JSON.parse(v); } catch (e) { return padrao; } };
+
+  // ---------- Sorteio ----------
+  function aleatorio(n) {
+    const a = new Uint32Array(1);
+    const limite = Math.floor(0xFFFFFFFF / n) * n;
+    do { crypto.getRandomValues(a); } while (a[0] >= limite);
+    return a[0] % n;
+  }
+  function embaralhar(lista) {
+    const v = lista.slice();
+    for (let i = v.length - 1; i > 0; i--) { const j = aleatorio(i + 1); [v[i], v[j]] = [v[j], v[i]]; }
+    return v;
+  }
+
+  // ---------- Som ----------
+  let somLigado = ler("som", true);
+  let audio = null;
+  function bip(freq = 880, dur = .12, vol = .25) {
+    if (!somLigado) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = freq; o.type = "sine";
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+  function somFim() { bip(660, .18); setTimeout(() => bip(440, .35), 200); }
+  function atualizarBotaoSom() {
+    $("btnSom").textContent = somLigado ? "🔊 Som" : "🔇 Sem som";
+    $("btnSom").setAttribute("aria-pressed", String(somLigado));
+  }
+  $("btnSom").onclick = () => { somLigado = !somLigado; guardar("som", somLigado); atualizarBotaoSom(); bip(); };
+  atualizarBotaoSom();
+
+  // ---------- Manter a tela acesa durante a partida ----------
+  let travaTela = null;
+  async function manterTelaAcesa(ligar) {
+    try {
+      if (ligar && "wakeLock" in navigator && !travaTela) {
+        travaTela = await navigator.wakeLock.request("screen");
+        travaTela.addEventListener("release", () => { travaTela = null; });
+      } else if (!ligar && travaTela) { await travaTela.release(); travaTela = null; }
+    } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && jogo) manterTelaAcesa(true);
+  });
+
+  // ---------- Telas ----------
+  function mostrar(id) {
+    document.querySelectorAll(".tela").forEach(t => t.classList.toggle("ativa", t.id === id));
+    window.scrollTo({ top: 0 });
+  }
+
+  // ---------- Configuração ----------
+  const campo = $("campoJogadores");
+  campo.value = ler("jogadores", "");
+  let selecionadas = new Set(ler("categorias", CATS.map(c => c.id)).filter(id => CATS.some(c => c.id === id)));
+  $("optTempo").value = String(ler("tempo", 30));
+  $("optRodadas").value = String(ler("rodadas", 2));
+  $("optImpostores").value = String(ler("impostores", 1));
+  $("optCategoria").checked = ler("mostrarCategoria", true);
+  if (!$("optTempo").value) $("optTempo").value = "30";
+  if (!$("optRodadas").value) $("optRodadas").value = "2";
+  if (!$("optImpostores").value) $("optImpostores").value = "1";
+
+  function lerJogadores() {
+    const vistos = new Set(), lista = [];
+    for (const linha of campo.value.split(/\n|;/)) {
+      const nome = linha.replace(/\s+/g, " ").trim();
+      if (nome && !vistos.has(nome.toLowerCase())) { vistos.add(nome.toLowerCase()); lista.push(nome); }
+    }
+    return lista;
+  }
+  function atualizarContagem() {
+    const n = lerJogadores().length;
+    $("contaJogadores").textContent = n === 0 ? "Nenhum jogador ainda. São precisos pelo menos 3."
+      : n < 3 ? `${n} jogador${n > 1 ? "es" : ""}. São precisos pelo menos 3.`
+      : `${n} jogadores. Nomes repetidos são contados uma vez só.`;
+    const max = Math.max(1, Math.floor((n - 1) / 2));
+    [...$("optImpostores").options].forEach(o => { o.disabled = n >= 3 && Number(o.value) > max; });
+    if ($("optImpostores").selectedOptions[0]?.disabled) $("optImpostores").value = "1";
+  }
+  campo.addEventListener("input", () => { guardar("jogadores", campo.value); atualizarContagem(); });
+
+  function desenharCategorias() {
+    const caixa = $("listaCategorias");
+    caixa.innerHTML = "";
+    for (const c of CATS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "cat";
+      b.setAttribute("aria-pressed", String(selecionadas.has(c.id)));
+      b.innerHTML = `<span class="ico" aria-hidden="true">${c.icone}</span><span class="nome"></span><span class="qtd">${c.lista.length}</span>`;
+      b.querySelector(".nome").textContent = c.nome;
+      b.onclick = () => {
+        selecionadas.has(c.id) ? selecionadas.delete(c.id) : selecionadas.add(c.id);
+        b.setAttribute("aria-pressed", String(selecionadas.has(c.id)));
+        salvarCategorias();
+      };
+      caixa.appendChild(b);
+    }
+    salvarCategorias();
+  }
+  function salvarCategorias() {
+    guardar("categorias", [...selecionadas]);
+    const total = CATS.filter(c => selecionadas.has(c.id)).reduce((s, c) => s + c.lista.length, 0);
+    $("contaPalavras").textContent = selecionadas.size === 0 ? "Escolha pelo menos uma categoria."
+      : `${selecionadas.size} de ${CATS.length} categorias · ${total.toLocaleString("pt-BR")} palavras para sortear.`;
+  }
+  $("btnTodas").onclick = () => { selecionadas = new Set(CATS.map(c => c.id)); desenharCategorias(); };
+  $("btnNenhuma").onclick = () => { selecionadas = new Set(); desenharCategorias(); };
+  ["optTempo", "optRodadas", "optImpostores"].forEach(id =>
+    $(id).addEventListener("change", () => guardar(id.slice(3).toLowerCase(), Number($(id).value))));
+  $("optCategoria").addEventListener("change", () => guardar("mostrarCategoria", $("optCategoria").checked));
+
+  // ---------- Partida ----------
+  let jogo = null;
+
+  function sortearPalavra() {
+    const cats = CATS.filter(c => selecionadas.has(c.id));
+    const usadas = new Set(ler("usadas", []));
+    let opcoes = [];
+    for (const c of cats) for (const p of c.lista) if (!usadas.has(p)) opcoes.push([p, c]);
+    if (opcoes.length === 0) { // todas já saíram: começa de novo
+      guardar("usadas", []);
+      for (const c of cats) for (const p of c.lista) opcoes.push([p, c]);
+    }
+    // Sorteia primeiro a categoria (para as pequenas também aparecerem), depois a palavra.
+    const catsDisponiveis = [...new Set(opcoes.map(o => o[1]))];
+    const cat = catsDisponiveis[aleatorio(catsDisponiveis.length)];
+    const daCat = opcoes.filter(o => o[1] === cat);
+    const [palavra] = daCat[aleatorio(daCat.length)];
+    const lista = [...usadas, palavra].slice(-600);
+    guardar("usadas", lista);
+    return { palavra, categoria: cat };
+  }
+
+  function novaPartida() {
+    const jogadores = lerJogadores();
+    if (jogadores.length < 3) { $("erroConfig").textContent = "Escreva o nome de pelo menos 3 jogadores."; campo.focus(); return; }
+    if (selecionadas.size === 0) { $("erroConfig").textContent = "Escolha pelo menos uma categoria."; return; }
+    $("erroConfig").textContent = "";
+    const nImp = Math.min(Number($("optImpostores").value), Math.max(1, Math.floor((jogadores.length - 1) / 2)));
+    const impostores = new Set(embaralhar(jogadores).slice(0, nImp));
+    const { palavra, categoria } = sortearPalavra();
+    // Ordem das pistas: aleatória, mas quem começa nunca é impostor.
+    let ordem = embaralhar(jogadores);
+    const primeiro = ordem.findIndex(n => !impostores.has(n));
+    ordem = ordem.slice(primeiro).concat(ordem.slice(0, primeiro));
+    jogo = {
+      jogadores, impostores, palavra, categoria, ordem,
+      distribuidos: 0,
+      tempo: Number($("optTempo").value),
+      rodadas: Number($("optRodadas").value),
+      mostrarCategoria: $("optCategoria").checked,
+      rodada: 1, vez: 0
+    };
+    manterTelaAcesa(true);
+    prepararDistribuicao();
+    mostrar("tela-distribuicao");
+  }
+
+  // ----- Distribuição -----
+  function prepararDistribuicao() {
+    const i = jogo.distribuidos, nome = jogo.jogadores[i];
+    $("contaDistribuicao").textContent = `Jogador ${i + 1} de ${jogo.jogadores.length}`;
+    $("nomeDistribuicao").textContent = nome;
+    $("nomeDistribuicao2").textContent = nome;
+    $("passeAparelho").hidden = false;
+    $("mostraPalavra").hidden = true;
+    $("progressoDistribuicao").innerHTML = jogo.jogadores
+      .map((_, k) => `<span class="${k < i ? "feito" : k === i ? "atual" : ""}"></span>`).join("");
+  }
+  $("btnVerPalavra").onclick = () => {
+    const nome = jogo.jogadores[jogo.distribuidos];
+    const eImpostor = jogo.impostores.has(nome);
+    $("nomeDono").textContent = nome;
+    $("cartaoPalavra").className = "cartao " + (eImpostor ? "impostor" : "palavra");
+    $("rotuloPalavra").textContent = eImpostor ? "Você é o" : "A palavra secreta é";
+    $("textoPalavra").textContent = eImpostor ? "IMPOSTOR" : jogo.palavra;
+    const cat = jogo.mostrarCategoria ? `Categoria: ${jogo.categoria.nome}` : "";
+    $("textoCategoria").textContent = eImpostor
+      ? `Você não sabe a palavra. Dê pistas que pareçam certas e não seja descoberto!${cat ? " " + cat + "." : ""}`
+      : cat;
+    $("passeAparelho").hidden = true;
+    $("mostraPalavra").hidden = false;
+  };
+  $("btnEsconder").onclick = () => {
+    // Apaga a palavra da tela antes de passar o aparelho.
+    $("textoPalavra").textContent = ""; $("textoCategoria").textContent = "";
+    jogo.distribuidos++;
+    if (jogo.distribuidos < jogo.jogadores.length) { prepararDistribuicao(); return; }
+    $("quemComeca").textContent = jogo.ordem[0];
+    mostrar("tela-pronto");
+  };
+
+  // ----- Pistas -----
+  const CIRC = 2 * Math.PI * 52;
+  ["arco", "arcoDebate"].forEach(id => { $(id).style.strokeDasharray = CIRC; $(id).style.strokeDashoffset = 0; });
+  let timer = null, restante = 0, fimEm = 0, estado = "parado"; // parado | correndo | pausado | esgotado
+
+  function pararTimer() { clearInterval(timer); timer = null; }
+  function desenharRelogio() {
+    const seg = Math.ceil(restante);
+    $("arco").style.strokeDashoffset = CIRC * (1 - Math.max(0, restante) / jogo.tempo);
+    $("relogio").classList.toggle("alerta", estado === "correndo" && seg <= 5 && seg > 0);
+    $("relogio").classList.toggle("fim", estado === "esgotado");
+    $("numTempo").textContent = estado === "esgotado" ? "Tempo esgotado!" : seg;
+  }
+  function tique() {
+    const antes = Math.ceil(restante);
+    restante = (fimEm - performance.now()) / 1000;
+    const agora = Math.ceil(restante);
+    if (agora !== antes && agora <= 3 && agora > 0) bip(990, .08, .18);
+    if (restante <= 0) { restante = 0; estado = "esgotado"; pararTimer(); somFim(); desenharAcoes(); }
+    desenharRelogio();
+  }
+  function iniciarTimer() {
+    estado = "correndo"; fimEm = performance.now() + restante * 1000;
+    pararTimer(); timer = setInterval(tique, 100); bip(880, .08, .15);
+    desenharAcoes(); desenharRelogio();
+  }
+
+  function proximo() {
+    const n = jogo.ordem.length;
+    if (jogo.vez + 1 < n) { jogo.vez++; return true; }
+    if (jogo.rodada < jogo.rodadas) { jogo.rodada++; jogo.vez = 0; return true; }
+    return false;
+  }
+  function nomeSeguinte() {
+    const n = jogo.ordem.length;
+    if (jogo.vez + 1 < n) return jogo.ordem[jogo.vez + 1];
+    if (jogo.rodada < jogo.rodadas) return jogo.ordem[0];
+    return null;
+  }
+
+  function prepararVez() {
+    pararTimer(); estado = "parado"; restante = jogo.tempo;
+    $("numRodada").textContent = jogo.rodada;
+    $("totRodadas").textContent = jogo.rodadas;
+    $("infoCategoria").hidden = !jogo.mostrarCategoria;
+    $("nomeCategoria").textContent = jogo.categoria.nome;
+    $("nomeVez").textContent = jogo.ordem[jogo.vez];
+    $("ordemPistas").innerHTML = "";
+    jogo.ordem.forEach((nome, k) => {
+      const s = document.createElement("span");
+      s.textContent = nome;
+      s.className = k < jogo.vez ? "feito" : k === jogo.vez ? "atual" : "";
+      $("ordemPistas").appendChild(s);
+    });
+    desenharAcoes(); desenharRelogio();
+  }
+
+  function botao(texto, classe, acao) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = texto; if (classe) b.className = classe; b.onclick = acao;
+    return b;
+  }
+  function avancar(comecarJa) {
+    pararTimer();
+    if (!proximo()) { irVotacao(); return; }
+    prepararVez();
+    if (comecarJa) iniciarTimer();
+  }
+  function desenharAcoes() {
+    const caixa = $("acoesPistas"); caixa.innerHTML = "";
+    const seguinte = nomeSeguinte();
+    const rotuloSeguinte = seguinte ? `Próximo: ${seguinte}` : "Ir para a votação";
+    if (estado === "parado") {
+      caixa.append(botao("Começar o tempo", "btn-principal", iniciarTimer));
+    } else if (estado === "correndo") {
+      caixa.append(botao("Pausar", "", () => { pararTimer(); restante = (fimEm - performance.now()) / 1000; estado = "pausado"; desenharAcoes(); }));
+      caixa.append(botao(seguinte ? `Já falei · ${rotuloSeguinte}` : "Já falei · Votação", "btn-menta", () => avancar(true)));
+    } else if (estado === "pausado") {
+      caixa.append(botao("Continuar", "btn-principal", iniciarTimer));
+      caixa.append(botao(rotuloSeguinte, "", () => avancar(true)));
+    } else {
+      caixa.append(botao(rotuloSeguinte, "btn-principal", () => avancar(true)));
+    }
+  }
+
+  $("btnIniciarPistas").onclick = () => { jogo.rodada = 1; jogo.vez = 0; prepararVez(); mostrar("tela-pistas"); };
+  $("btnIrVotacao").onclick = () => irVotacao();
+
+  // ----- Votação -----
+  let timerDebate = null;
+  const DEBATE = 120;
+  function pararDebate() {
+    clearInterval(timerDebate); timerDebate = null;
+    $("relogioDebate").classList.remove("fim", "alerta");
+    $("arcoDebate").style.strokeDashoffset = 0;
+    $("numDebate").textContent = "2:00";
+    $("btnDebate").textContent = "Marcar 2 minutos de conversa";
+  }
+  function irVotacao() {
+    pararTimer(); pararDebate();
+    $("textoVotacao").textContent = jogo.impostores.size > 1
+      ? `Conversem e votem: quem são os ${jogo.impostores.size} impostores?`
+      : "Conversem e votem: quem é o impostor?";
+    mostrar("tela-votacao");
+  }
+  $("btnDebate").onclick = () => {
+    if (timerDebate) { pararDebate(); return; }
+    const fim = performance.now() + DEBATE * 1000;
+    $("btnDebate").textContent = "Parar o tempo";
+    bip(880, .08, .15);
+    timerDebate = setInterval(() => {
+      const r = Math.max(0, (fim - performance.now()) / 1000), s = Math.ceil(r);
+      $("arcoDebate").style.strokeDashoffset = CIRC * (1 - r / DEBATE);
+      $("numDebate").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      $("relogioDebate").classList.toggle("alerta", s <= 10 && s > 0);
+      if (r <= 0) {
+        clearInterval(timerDebate); timerDebate = null; somFim();
+        $("relogioDebate").classList.add("fim"); $("numDebate").textContent = "Fim!";
+        $("btnDebate").textContent = "Marcar 2 minutos de novo";
+      }
+    }, 200);
+  };
+  $("btnMaisRodada").onclick = () => {
+    pararDebate(); jogo.rodadas++; jogo.rodada = jogo.rodadas; jogo.vez = 0;
+    prepararVez(); mostrar("tela-pistas");
+  };
+  $("btnRevelar").onclick = () => {
+    pararDebate();
+    const varios = jogo.impostores.size > 1;
+    $("rotuloImpostor").textContent = varios ? "Os impostores eram" : "O impostor era";
+    $("listaImpostores").innerHTML = "";
+    jogo.jogadores.filter(n => jogo.impostores.has(n)).forEach(n => {
+      const d = document.createElement("div"); d.className = "nome-grande"; d.textContent = n;
+      $("listaImpostores").appendChild(d);
+    });
+    $("palavraRevelada").textContent = jogo.palavra;
+    $("categoriaRevelada").textContent = `Categoria: ${jogo.categoria.nome}`;
+    somFim();
+    mostrar("tela-revelacao");
+  };
+
+  // ----- Navegação -----
+  function voltarConfig() {
+    pararTimer(); pararDebate(); jogo = null; manterTelaAcesa(false);
+    atualizarContagem(); mostrar("tela-config");
+  }
+  $("btnComecar").onclick = novaPartida;
+  $("btnNovaPartida").onclick = novaPartida;
+  $("btnConfigurar").onclick = voltarConfig;
+  $("btnCancelar1").onclick = () => { if (confirm("Cancelar esta partida? A palavra será trocada na próxima.")) voltarConfig(); };
+
+  desenharCategorias();
+  atualizarContagem();
+})();
+</script>
+</body>
+</html>
